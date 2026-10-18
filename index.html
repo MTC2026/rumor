@@ -1,0 +1,836 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rumor by Darshan N Lal</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111827;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .touch-btn {
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(4px);
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            touch-action: none;
+        }
+        .touch-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.7);
+        }
+        .hotbar-slot.selected {
+            border-color: #f59e0b !important;
+            transform: scale(1.1);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white select-none">
+
+    <!-- GAME CANVAS -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- CROSSHAIR -->
+    <div id="crosshair" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 flex items-center justify-center">
+        <div class="w-4 h-0.5 bg-white/80 absolute"></div>
+        <div class="h-4 w-0.5 bg-white/80 absolute"></div>
+    </div>
+
+    <!-- HUD & HEADER UI -->
+    <div class="fixed top-0 left-0 right-0 p-3 flex justify-between items-center pointer-events-none z-20">
+        <!-- Title & Player Badge -->
+        <div class="bg-black/60 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 pointer-events-auto flex items-center gap-3 shadow-lg">
+            <div>
+                <h1 class="font-extrabold text-base sm:text-lg tracking-wider text-amber-400">RUMOR</h1>
+                <p class="text-[10px] sm:text-xs text-gray-300">by <span class="font-semibold text-emerald-400">Darshan N Lal</span></p>
+                <div id="player-tag" class="text-[11px] font-medium text-amber-300 mt-0.5 flex items-center gap-1">
+                    <i class="fa-solid fa-user text-[10px]"></i> <span id="player-name-display">Player</span>
+                </div>
+            </div>
+            <div id="fps-counter" class="text-xs bg-gray-800/80 px-2 py-1 rounded text-green-400 font-mono border border-gray-700">60 FPS</div>
+        </div>
+
+        <!-- Action Buttons Top Right -->
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-user-switch" title="Switch User" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-amber-400 hover:bg-black/80 transition-all">
+                <i class="fa-solid fa-user-gear"></i>
+            </button>
+            <button id="btn-sound" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-white hover:bg-black/80 transition-all">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+            <button id="btn-fullscreen" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-white hover:bg-black/80 transition-all">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+            <button id="btn-help" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-white hover:bg-black/80 transition-all">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- HOTBAR & BLOCK SELECTION -->
+    <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 max-w-[95vw]">
+        <!-- Action Mode Indicators (Mobile) -->
+        <div class="flex gap-2 bg-black/50 backdrop-blur-md p-1 rounded-full border border-white/10">
+            <button id="mode-place" class="px-3 py-1 rounded-full text-xs font-bold transition-all bg-amber-500 text-black">
+                <i class="fa-solid fa-cube mr-1"></i> Place
+            </button>
+            <button id="mode-break" class="px-3 py-1 rounded-full text-xs font-bold transition-all bg-gray-800 text-gray-300">
+                <i class="fa-solid fa-burst mr-1"></i> Break
+            </button>
+        </div>
+
+        <!-- Block Slots -->
+        <div id="hotbar" class="flex gap-1.5 sm:gap-2 bg-black/70 backdrop-blur-md border border-white/20 p-2 rounded-2xl shadow-2xl overflow-x-auto no-scrollbar max-w-full">
+            <!-- Slots injected dynamically by JS -->
+        </div>
+    </div>
+
+    <!-- MOBILE TOUCH CONTROLS -->
+    <div id="touch-controls" class="fixed inset-0 pointer-events-none z-10 hidden">
+        <div id="joystick-zone" class="absolute bottom-8 left-6 w-32 h-32 rounded-full border-2 border-white/20 bg-black/20 pointer-events-auto touch-action-none flex items-center justify-center">
+            <div id="joystick-knob" class="w-12 h-12 rounded-full bg-amber-500/80 border-2 border-white/60 transform transition-transform"></div>
+        </div>
+
+        <div class="absolute bottom-10 right-6 flex flex-col gap-4 items-end pointer-events-auto">
+            <button id="touch-jump" class="touch-btn w-16 h-16 bg-amber-500/40 active:bg-amber-500/80 border-amber-300/50">
+                <i class="fa-solid fa-arrow-up text-xl"></i>
+            </button>
+            <button id="touch-action" class="touch-btn w-14 h-14 bg-emerald-500/40 active:bg-emerald-500/80 border-emerald-300/50">
+                <i class="fa-solid fa-hand-pointer text-lg"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- LOGIN / ENTER NAME MODAL -->
+    <div id="modal-login" class="fixed inset-0 bg-black/85 backdrop-blur-md z-40 flex items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 text-center">
+            <div class="space-y-1">
+                <h2 class="text-2xl font-black tracking-wide text-amber-400">RUMOR</h2>
+                <p class="text-xs text-emerald-400 font-semibold">by Darshan N Lal</p>
+            </div>
+
+            <!-- Existing User Greeting View -->
+            <div id="returning-user-view" class="hidden space-y-4">
+                <div class="p-3 bg-gray-900/80 rounded-xl border border-gray-700 text-center">
+                    <p class="text-xs text-gray-400">Welcome Back,</p>
+                    <p id="welcome-player-name" class="text-xl font-bold text-amber-300 capitalize mt-0.5">Player</p>
+                </div>
+                <button id="btn-continue-user" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-extrabold rounded-xl transition-all shadow-lg text-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-gamepad"></i> Play Game
+                </button>
+                <button id="btn-change-user" class="text-xs text-gray-400 hover:text-white underline">
+                    Switch / Change Name
+                </button>
+            </div>
+
+            <!-- New User Login Form View -->
+            <form id="login-form" class="space-y-4">
+                <div class="text-left space-y-1.5">
+                    <label for="username-input" class="text-xs font-semibold text-gray-300 uppercase tracking-wider block">Enter Your Name</label>
+                    <div class="relative">
+                        <input type="text" id="username-input" required maxlength="18" placeholder="e.g. Alex" class="w-full bg-gray-900 border border-gray-700 focus:border-amber-400 text-white rounded-xl px-4 py-2.5 outline-none text-sm font-medium transition-colors pl-10" />
+                        <i class="fa-solid fa-user absolute left-3.5 top-3 text-gray-500 text-sm"></i>
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-extrabold rounded-xl transition-all shadow-lg text-sm flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Save & Play
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- HELP / CONTROLS MODAL -->
+    <div id="modal-help" class="fixed inset-0 bg-black/80 backdrop-blur-md z-30 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3">
+                <h3 class="text-xl font-bold text-amber-400">Welcome to Rumor</h3>
+                <button id="btn-close-help" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="space-y-3 text-sm text-gray-300">
+                <p class="text-emerald-400 font-medium">Developed by <strong>Darshan N Lal</strong></p>
+                <p>Rumor is a lightweight 3D voxel sandbox game built to run smoothly directly in your browser without any installations or downloads.</p>
+                
+                <div class="bg-gray-900/60 p-3 rounded-xl space-y-2 border border-gray-700">
+                    <p class="font-semibold text-amber-300 text-xs uppercase tracking-wider">Controls Guide</p>
+                    <ul class="space-y-1.5 text-xs">
+                        <li><span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Desktop</span> WASD to move | Space to jump</li>
+                        <li><span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Mouse</span> Click screen to lock camera & view around</li>
+                        <li><span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Left Click</span> Break Block | <span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Right Click</span> Place Block</li>
+                        <li><span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Number 1-8</span> Switch Block Type</li>
+                        <li><span class="text-white font-mono bg-gray-800 px-1.5 py-0.5 rounded">Mobile</span> Left Virtual Joystick to move, Drag right screen to look, Use bottom buttons to Place/Break blocks.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <button id="btn-start" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black font-bold rounded-xl transition-all shadow-lg text-center">
+                Start Playing
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC -->
+    <script>
+        // Player Identity State & LocalStorage Management
+        let currentUsername = 'Player';
+
+        const loginModal = document.getElementById('modal-login');
+        const loginForm = document.getElementById('login-form');
+        const usernameInput = document.getElementById('username-input');
+        const returningUserView = document.getElementById('returning-user-view');
+        const welcomePlayerName = document.getElementById('welcome-player-name');
+        const playerNameDisplay = document.getElementById('player-name-display');
+
+        function initPlayerSession() {
+            const savedName = localStorage.getItem('rumor_player_name');
+            if (savedName) {
+                currentUsername = savedName;
+                welcomePlayerName.innerText = savedName;
+                playerNameDisplay.innerText = savedName;
+                returningUserView.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+            } else {
+                returningUserView.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+            }
+        }
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nameVal = usernameInput.value.trim();
+            if (nameVal) {
+                currentUsername = nameVal;
+                localStorage.setItem('rumor_player_name', nameVal);
+                playerNameDisplay.innerText = nameVal;
+                loginModal.classList.add('hidden');
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            }
+        });
+
+        document.getElementById('btn-continue-user').addEventListener('click', () => {
+            loginModal.classList.add('hidden');
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        });
+
+        document.getElementById('btn-change-user').addEventListener('click', () => {
+            returningUserView.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            usernameInput.value = currentUsername;
+            usernameInput.focus();
+        });
+
+        document.getElementById('btn-user-switch').addEventListener('click', () => {
+            initPlayerSession();
+            loginModal.classList.remove('hidden');
+        });
+
+        // Block Types Configuration
+        const BLOCK_TYPES = {
+            GRASS: { id: 1, name: 'Grass', color: '#4ade80', sideColor: '#16a34a', topColor: '#4ade80' },
+            DIRT: { id: 2, name: 'Dirt', color: '#854d0e', sideColor: '#854d0e', topColor: '#854d0e' },
+            STONE: { id: 3, name: 'Stone', color: '#64748b', sideColor: '#64748b', topColor: '#64748b' },
+            WOOD: { id: 4, name: 'Wood', color: '#a16207', sideColor: '#a16207', topColor: '#713f12' },
+            LEAVES: { id: 5, name: 'Leaves', color: '#15803d', sideColor: '#15803d', topColor: '#15803d' },
+            BRICK: { id: 6, name: 'Brick', color: '#b91c1c', sideColor: '#b91c1c', topColor: '#b91c1c' },
+            SAND: { id: 7, name: 'Sand', color: '#fde047', sideColor: '#fde047', topColor: '#fde047' },
+            GLASS: { id: 8, name: 'Glass', color: '#38bdf8', sideColor: '#38bdf8', topColor: '#38bdf8', transparent: true, opacity: 0.6 }
+        };
+
+        const HOTBAR_BLOCKS = [
+            BLOCK_TYPES.GRASS,
+            BLOCK_TYPES.DIRT,
+            BLOCK_TYPES.STONE,
+            BLOCK_TYPES.WOOD,
+            BLOCK_TYPES.LEAVES,
+            BLOCK_TYPES.BRICK,
+            BLOCK_TYPES.SAND,
+            BLOCK_TYPES.GLASS
+        ];
+
+        let selectedBlockIndex = 0;
+        let mobileActionMode = 'place';
+        let soundEnabled = true;
+
+        // Generate Procedural Textures to give Minecraft style block details
+        function createBlockTextures() {
+            const materials = {};
+
+            Object.keys(BLOCK_TYPES).forEach(key => {
+                const b = BLOCK_TYPES[key];
+                
+                const createTileCanvas = (colorHex, noiseAmount = 0.15) => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 16;
+                    canvas.height = 16;
+                    const ctx = canvas.getContext('2d');
+                    
+                    ctx.fillStyle = colorHex;
+                    ctx.fillRect(0, 0, 16, 16);
+
+                    for(let x = 0; x < 16; x++) {
+                        for(let y = 0; y < 16; y++) {
+                            if (Math.random() < 0.4) {
+                                const factor = (Math.random() - 0.5) * noiseAmount;
+                                ctx.fillStyle = factor > 0 ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+                                ctx.fillRect(x, y, 1, 1);
+                            }
+                        }
+                    }
+
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(0, 0, 16, 16);
+
+                    const texture = new THREE.CanvasTexture(canvas);
+                    texture.magFilter = THREE.NearestFilter;
+                    texture.minFilter = THREE.NearestFilter;
+                    return texture;
+                };
+
+                const topTex = createTileCanvas(b.topColor);
+                const sideTex = createTileCanvas(b.sideColor);
+                const bottomTex = createTileCanvas(b.id === BLOCK_TYPES.GRASS.id ? BLOCK_TYPES.DIRT.topColor : b.topColor);
+
+                const topMat = new THREE.MeshLambertMaterial({ map: topTex, transparent: !!b.transparent, opacity: b.opacity || 1.0 });
+                const sideMat = new THREE.MeshLambertMaterial({ map: sideTex, transparent: !!b.transparent, opacity: b.opacity || 1.0 });
+                const bottomMat = new THREE.MeshLambertMaterial({ map: bottomTex, transparent: !!b.transparent, opacity: b.opacity || 1.0 });
+
+                materials[b.id] = [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
+            });
+
+            return materials;
+        }
+
+        const canvas = document.getElementById('game-canvas');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.FogExp2(0x87CEEB, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        sunLight.position.set(40, 60, 20);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        const blockMaterials = createBlockTextures();
+        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+
+        const worldBlocks = new Map();
+        const blockObjects = [];
+
+        function getBlockKey(x, y, z) {
+            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+        }
+
+        const WORLD_SIZE = 24;
+
+        function generateTerrain() {
+            for (let x = -WORLD_SIZE/2; x < WORLD_SIZE/2; x++) {
+                for (let z = -WORLD_SIZE/2; z < WORLD_SIZE/2; z++) {
+                    const height = Math.floor(Math.sin(x * 0.2) * Math.cos(z * 0.2) * 2) + 2;
+
+                    for (let y = 0; y <= height; y++) {
+                        let blockType = BLOCK_TYPES.STONE.id;
+                        if (y === height) {
+                            blockType = BLOCK_TYPES.GRASS.id;
+                        } else if (y >= height - 2) {
+                            blockType = BLOCK_TYPES.DIRT.id;
+                        }
+
+                        spawnBlock(x, y, z, blockType);
+                    }
+
+                    if (Math.random() < 0.02 && height >= 2) {
+                        spawnTree(x, height + 1, z);
+                    }
+                }
+            }
+        }
+
+        function spawnBlock(x, y, z, typeId) {
+            const key = getBlockKey(x, y, z);
+            if (worldBlocks.has(key)) return;
+
+            const mesh = new THREE.Mesh(blockGeometry, blockMaterials[typeId]);
+            mesh.position.set(x, y, z);
+            mesh.userData = { typeId, x, y, z };
+            
+            scene.add(mesh);
+            worldBlocks.set(key, mesh);
+            blockObjects.push(mesh);
+            return mesh;
+        }
+
+        function removeBlock(mesh) {
+            if (!mesh) return;
+            const { x, y, z } = mesh.userData;
+            const key = getBlockKey(x, y, z);
+            
+            scene.remove(mesh);
+            worldBlocks.delete(key);
+            const idx = blockObjects.indexOf(mesh);
+            if (idx > -1) blockObjects.splice(idx, 1);
+
+            playAudioEffect('break');
+        }
+
+        function spawnTree(x, y, z) {
+            const trunkHeight = 4;
+            for (let i = 0; i < trunkHeight; i++) {
+                spawnBlock(x, y + i, z, BLOCK_TYPES.WOOD.id);
+            }
+            const leafStart = y + trunkHeight - 1;
+            for (let lx = -1; lx <= 1; lx++) {
+                for (let lz = -1; lz <= 1; lz++) {
+                    for (let ly = 0; ly <= 2; ly++) {
+                        if (lx === 0 && lz === 0 && ly < 2) continue;
+                        spawnBlock(x + lx, leafStart + ly, z + lz, BLOCK_TYPES.LEAVES.id);
+                    }
+                }
+            }
+        }
+
+        generateTerrain();
+
+        const player = {
+            position: new THREE.Vector3(0, 8, 0),
+            velocity: new THREE.Vector3(),
+            rotation: new THREE.Euler(0, 0, 0, 'YXZ'),
+            height: 1.7,
+            radius: 0.35,
+            onGround: false
+        };
+
+        camera.position.copy(player.position);
+
+        const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false, Space: false };
+        let isTouchDevice = false;
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playAudioEffect(type) {
+            if (!soundEnabled || !audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'break') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'place') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target === canvas && !isTouchDevice && loginModal.classList.contains('hidden')) {
+                canvas.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === canvas) {
+                const sensitivity = 0.0022;
+                player.rotation.y -= e.movementX * sensitivity;
+                player.rotation.x -= e.movementY * sensitivity;
+                player.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, player.rotation.x));
+            }
+        });
+
+        let touchLookId = null;
+        let lastTouchX = 0, lastTouchY = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            isTouchDevice = true;
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.clientX > window.innerWidth / 2 && touchLookId === null) {
+                    touchLookId = touch.identifier;
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                }
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (touch.identifier === touchLookId) {
+                    const deltaX = touch.clientX - lastTouchX;
+                    const deltaY = touch.clientY - lastTouchY;
+                    
+                    const touchSensitivity = 0.004;
+                    player.rotation.y -= deltaX * touchSensitivity;
+                    player.rotation.x -= deltaY * touchSensitivity;
+                    player.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, player.rotation.x));
+
+                    lastTouchX = touch.clientX;
+                    lastTouchY = touch.clientY;
+                }
+            }
+        });
+
+        const resetTouchLook = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === touchLookId) {
+                    touchLookId = null;
+                }
+            }
+        };
+
+        window.addEventListener('touchend', resetTouchLook);
+        window.addEventListener('touchcancel', resetTouchLook);
+
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let joystickActive = false;
+        let joystickTouchId = null;
+        let joystickVector = { x: 0, y: 0 };
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joystickActive = true;
+            joystickTouchId = touch.identifier;
+            updateJoystick(touch);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!joystickActive) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    updateJoystick(e.changedTouches[i]);
+                }
+            }
+        });
+
+        const endJoystick = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    joystickActive = false;
+                    joystickTouchId = null;
+                    joystickVector = { x: 0, y: 0 };
+                    joystickKnob.style.transform = `translate(0px, 0px)`;
+                }
+            }
+        };
+
+        window.addEventListener('touchend', endJoystick);
+        window.addEventListener('touchcancel', endJoystick);
+
+        function updateJoystick(touch) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const maxRadius = rect.width / 2 - 10;
+
+            const distance = Math.hypot(dx, dy);
+            if (distance > maxRadius) {
+                dx = (dx / distance) * maxRadius;
+                dy = (dy / distance) * maxRadius;
+            }
+
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystickVector.x = dx / maxRadius;
+            joystickVector.y = dy / maxRadius;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
+            if (e.key >= '1' && e.key <= '8') {
+                selectHotbarSlot(parseInt(e.key) - 1);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const screenCenter = new THREE.Vector2(0, 0);
+
+        function handleBlockAction(actionType) {
+            raycaster.setFromCamera(screenCenter, camera);
+            const intersects = raycaster.intersectObjects(blockObjects);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                if (hit.distance > 6) return;
+
+                if (actionType === 'break') {
+                    removeBlock(hit.object);
+                } else if (actionType === 'place') {
+                    const normal = hit.face.normal;
+                    const placePos = hit.object.position.clone().add(normal);
+
+                    const pPos = player.position;
+                    const distToPlayer = placePos.distanceTo(new THREE.Vector3(pPos.x, placePos.y, pPos.z));
+                    if (distToPlayer < 0.8 && Math.abs(placePos.y - pPos.y) < 1.5) {
+                        return;
+                    }
+
+                    const selected = HOTBAR_BLOCKS[selectedBlockIndex];
+                    spawnBlock(placePos.x, placePos.y, placePos.z, selected.id);
+                    playAudioEffect('place');
+                }
+            }
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if (document.pointerLockElement !== canvas) return;
+            if (e.button === 0) handleBlockAction('break');
+            if (e.button === 2) handleBlockAction('place');
+        });
+
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        const hotbarEl = document.getElementById('hotbar');
+
+        function renderHotbar() {
+            hotbarEl.innerHTML = '';
+            HOTBAR_BLOCKS.forEach((block, index) => {
+                const slot = document.createElement('button');
+                slot.className = `hotbar-slot relative w-10 h-10 sm:w-12 sm:h-12 rounded-xl border-2 border-white/20 bg-gray-800/80 flex items-center justify-center transition-all ${index === selectedBlockIndex ? 'selected' : ''}`;
+                
+                const preview = document.createElement('div');
+                preview.className = 'w-6 h-6 sm:w-7 sm:h-7 rounded-md border border-black/30 shadow-inner';
+                preview.style.backgroundColor = block.color;
+
+                slot.appendChild(preview);
+                
+                const label = document.createElement('span');
+                label.className = 'absolute top-0.5 left-1 text-[9px] font-mono text-gray-300 pointer-events-none';
+                label.innerText = index + 1;
+                slot.appendChild(label);
+
+                slot.addEventListener('click', () => selectHotbarSlot(index));
+                hotbarEl.appendChild(slot);
+            });
+        }
+
+        function selectHotbarSlot(index) {
+            if (index >= 0 && index < HOTBAR_BLOCKS.length) {
+                selectedBlockIndex = index;
+                renderHotbar();
+            }
+        }
+
+        renderHotbar();
+
+        const modePlaceBtn = document.getElementById('mode-place');
+        const modeBreakBtn = document.getElementById('mode-break');
+
+        modePlaceBtn.addEventListener('click', () => {
+            mobileActionMode = 'place';
+            modePlaceBtn.className = 'px-3 py-1 rounded-full text-xs font-bold transition-all bg-amber-500 text-black';
+            modeBreakBtn.className = 'px-3 py-1 rounded-full text-xs font-bold transition-all bg-gray-800 text-gray-300';
+        });
+
+        modeBreakBtn.addEventListener('click', () => {
+            mobileActionMode = 'break';
+            modeBreakBtn.className = 'px-3 py-1 rounded-full text-xs font-bold transition-all bg-red-500 text-white';
+            modePlaceBtn.className = 'px-3 py-1 rounded-full text-xs font-bold transition-all bg-gray-800 text-gray-300';
+        });
+
+        document.getElementById('touch-action').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleBlockAction(mobileActionMode);
+        });
+
+        document.getElementById('touch-jump').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (player.onGround) {
+                player.velocity.y = 0.16;
+                player.onGround = false;
+            }
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('btn-sound').innerHTML = soundEnabled ? 
+                '<i class="fa-solid fa-volume-high"></i>' : 
+                '<i class="fa-solid fa-volume-xmark text-red-400"></i>';
+        });
+
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        });
+
+        const helpModal = document.getElementById('modal-help');
+        document.getElementById('btn-help').addEventListener('click', () => helpModal.classList.remove('hidden'));
+        document.getElementById('btn-close-help').addEventListener('click', () => helpModal.classList.add('hidden'));
+        document.getElementById('btn-start').addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        });
+
+        const GRAVITY = -0.0075;
+        const MOVE_SPEED = 0.08;
+
+        function updatePhysics() {
+            camera.rotation.copy(player.rotation);
+
+            const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+            const side = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+
+            let moveDir = new THREE.Vector3();
+
+            if (keys.KeyW) moveDir.add(forward);
+            if (keys.KeyS) moveDir.sub(forward);
+            if (keys.KeyD) moveDir.add(side);
+            if (keys.KeyA) moveDir.sub(side);
+
+            if (joystickActive) {
+                moveDir.addScaledVector(forward, -joystickVector.y);
+                moveDir.addScaledVector(side, joystickVector.x);
+            }
+
+            if (moveDir.lengthSq() > 0) moveDir.normalize();
+
+            player.position.x += moveDir.x * MOVE_SPEED;
+            player.position.z += moveDir.z * MOVE_SPEED;
+
+            if (keys.Space && player.onGround) {
+                player.velocity.y = 0.16;
+                player.onGround = false;
+            }
+
+            player.velocity.y += GRAVITY;
+            player.position.y += player.velocity.y;
+
+            const px = Math.round(player.position.x);
+            const pz = Math.round(player.position.z);
+            let highestGroundY = -10;
+
+            for (let y = Math.floor(player.position.y); y >= 0; y--) {
+                if (worldBlocks.has(getBlockKey(px, y, pz))) {
+                    highestGroundY = y + 0.5 + player.height;
+                    break;
+                }
+            }
+
+            if (player.position.y <= highestGroundY) {
+                player.position.y = highestGroundY;
+                player.velocity.y = 0;
+                player.onGround = true;
+            } else {
+                player.onGround = false;
+            }
+
+            if (player.position.y < -10) {
+                player.position.set(0, 10, 0);
+                player.velocity.set(0, 0, 0);
+            }
+
+            camera.position.copy(player.position);
+        }
+
+        let lastTime = performance.now();
+        let frameCount = 0;
+        const fpsCounter = document.getElementById('fps-counter');
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            updatePhysics();
+
+            frameCount++;
+            const now = performance.now();
+            if (now - lastTime >= 1000) {
+                fpsCounter.innerText = `${frameCount} FPS`;
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            const time = now * 0.0001;
+            sunLight.position.x = Math.cos(time) * 50;
+            sunLight.position.z = Math.sin(time) * 50;
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = () => {
+            initPlayerSession();
+            animate();
+        };
+    </script>
+</body>
+</html>
