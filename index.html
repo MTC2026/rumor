@@ -89,6 +89,9 @@
 
         <!-- Action Buttons Top Right -->
         <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-world-select" title="Switch World" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-emerald-400 hover:bg-black/80 transition-all">
+                <i class="fa-solid fa-earth-americas"></i>
+            </button>
             <button id="btn-user-switch" title="Switch User" class="w-10 h-10 bg-black/60 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-amber-400 hover:bg-black/80 transition-all">
                 <i class="fa-solid fa-user-gear"></i>
             </button>
@@ -176,6 +179,56 @@
         </div>
     </div>
 
+    <!-- WORLD SELECTION & LANDSCAPE MODAL -->
+    <div id="modal-worlds" class="fixed inset-0 bg-black/85 backdrop-blur-md z-40 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3">
+                <div>
+                    <h3 class="text-xl font-bold text-amber-400">Select Landscape Mode</h3>
+                    <p class="text-xs text-gray-400">Choose or reset your saved game world</p>
+                </div>
+                <button id="btn-close-worlds" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-left">
+                <button data-world="hills" class="world-card p-3 bg-gray-900/80 hover:bg-gray-900 border border-gray-700 rounded-xl transition-all group">
+                    <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-1">
+                        <i class="fa-solid fa-mountain-sun"></i> Rolling Hills
+                    </div>
+                    <p class="text-[11px] text-gray-400">Classic smooth terrain with scattered trees.</p>
+                </button>
+
+                <button data-world="mountains" class="world-card p-3 bg-gray-900/80 hover:bg-gray-900 border border-gray-700 rounded-xl transition-all group">
+                    <div class="flex items-center gap-2 text-sky-400 font-bold text-sm mb-1">
+                        <i class="fa-solid fa-mountain"></i> Steep Peaks
+                    </div>
+                    <p class="text-[11px] text-gray-400">Dramatic high mountains and deep valleys.</p>
+                </button>
+
+                <button data-world="flat" class="world-card p-3 bg-gray-900/80 hover:bg-gray-900 border border-gray-700 rounded-xl transition-all group">
+                    <div class="flex items-center gap-2 text-amber-400 font-bold text-sm mb-1">
+                        <i class="fa-solid fa-square-full text-xs"></i> Flat Plains
+                    </div>
+                    <p class="text-[11px] text-gray-400">Completely flat landscape, perfect for giant builds.</p>
+                </button>
+
+                <button data-world="islands" class="world-card p-3 bg-gray-900/80 hover:bg-gray-900 border border-gray-700 rounded-xl transition-all group">
+                    <div class="flex items-center gap-2 text-teal-400 font-bold text-sm mb-1">
+                        <i class="fa-solid fa-water"></i> Archipelago
+                    </div>
+                    <p class="text-[11px] text-gray-400">Isolated sandy islands surrounded by deep water.</p>
+                </button>
+            </div>
+
+            <div class="pt-2 border-t border-gray-700 flex justify-between items-center text-xs">
+                <span id="current-world-label" class="text-amber-300 font-medium">Active: Rolling Hills</span>
+                <button id="btn-reset-world" class="text-red-400 hover:text-red-300 underline font-semibold">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Reset World
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- HELP / CONTROLS MODAL -->
     <div id="modal-help" class="fixed inset-0 bg-black/80 backdrop-blur-md z-30 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-800 border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -210,6 +263,7 @@
     <script>
         // Player Identity State & LocalStorage Management
         let currentUsername = 'Player';
+        let currentWorldMode = localStorage.getItem('rumor_active_world') || 'hills';
 
         const loginModal = document.getElementById('modal-login');
         const loginForm = document.getElementById('login-form');
@@ -217,6 +271,9 @@
         const returningUserView = document.getElementById('returning-user-view');
         const welcomePlayerName = document.getElementById('welcome-player-name');
         const playerNameDisplay = document.getElementById('player-name-display');
+
+        const worldsModal = document.getElementById('modal-worlds');
+        const currentWorldLabel = document.getElementById('current-world-label');
 
         function initPlayerSession() {
             const savedName = localStorage.getItem('rumor_player_name');
@@ -260,6 +317,41 @@
             initPlayerSession();
             loginModal.classList.remove('hidden');
         });
+
+        // World Selection Handlers
+        document.getElementById('btn-world-select').addEventListener('click', () => {
+            updateWorldModalUI();
+            worldsModal.classList.remove('hidden');
+        });
+
+        document.getElementById('btn-close-worlds').addEventListener('click', () => {
+            worldsModal.classList.add('hidden');
+        });
+
+        document.querySelectorAll('.world-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const mode = card.getAttribute('data-world');
+                if (mode !== currentWorldMode) {
+                    saveWorldState(); // Save current world before switching
+                    currentWorldMode = mode;
+                    localStorage.setItem('rumor_active_world', mode);
+                    loadWorldState(); // Load new chosen landscape
+                    updateWorldModalUI();
+                }
+                worldsModal.classList.add('hidden');
+            });
+        });
+
+        document.getElementById('btn-reset-world').addEventListener('click', () => {
+            localStorage.removeItem(`rumor_world_data_${currentWorldMode}`);
+            generateTerrain(currentWorldMode);
+            worldsModal.classList.add('hidden');
+        });
+
+        function updateWorldModalUI() {
+            const names = { hills: 'Rolling Hills', mountains: 'Steep Peaks', flat: 'Flat Plains', islands: 'Archipelago' };
+            currentWorldLabel.innerText = `Active: ${names[currentWorldMode] || 'Rolling Hills'}`;
+        }
 
         // Block Types Configuration
         const BLOCK_TYPES = {
@@ -369,15 +461,35 @@
 
         const WORLD_SIZE = 24;
 
-        function generateTerrain() {
+        function clearCurrentWorld() {
+            blockObjects.forEach(obj => scene.remove(obj));
+            blockObjects.length = 0;
+            worldBlocks.clear();
+        }
+
+        function generateTerrain(mode = 'hills') {
+            clearCurrentWorld();
+
             for (let x = -WORLD_SIZE/2; x < WORLD_SIZE/2; x++) {
                 for (let z = -WORLD_SIZE/2; z < WORLD_SIZE/2; z++) {
-                    const height = Math.floor(Math.sin(x * 0.2) * Math.cos(z * 0.2) * 2) + 2;
+                    let height = 1;
+
+                    if (mode === 'hills') {
+                        height = Math.floor(Math.sin(x * 0.2) * Math.cos(z * 0.2) * 2) + 2;
+                    } else if (mode === 'mountains') {
+                        height = Math.floor(Math.sin(x * 0.15) * Math.cos(z * 0.15) * 5) + 4;
+                    } else if (mode === 'flat') {
+                        height = 1;
+                    } else if (mode === 'islands') {
+                        const dist = Math.sqrt(x * x + z * z);
+                        height = Math.floor(Math.sin(x * 0.3) * Math.cos(z * 0.3) * 3) + 2;
+                        if (dist > 8 && Math.sin(x * 0.4) > 0) height = -1; // Water gap
+                    }
 
                     for (let y = 0; y <= height; y++) {
                         let blockType = BLOCK_TYPES.STONE.id;
                         if (y === height) {
-                            blockType = BLOCK_TYPES.GRASS.id;
+                            blockType = mode === 'islands' ? BLOCK_TYPES.SAND.id : BLOCK_TYPES.GRASS.id;
                         } else if (y >= height - 2) {
                             blockType = BLOCK_TYPES.DIRT.id;
                         }
@@ -385,10 +497,38 @@
                         spawnBlock(x, y, z, blockType);
                     }
 
-                    if (Math.random() < 0.02 && height >= 2) {
+                    if (mode !== 'flat' && Math.random() < 0.02 && height >= 2) {
                         spawnTree(x, height + 1, z);
                     }
                 }
+            }
+            saveWorldState();
+        }
+
+        function saveWorldState() {
+            const stateData = [];
+            worldBlocks.forEach((mesh) => {
+                const { x, y, z, typeId } = mesh.userData;
+                stateData.push({ x, y, z, typeId });
+            });
+            localStorage.setItem(`rumor_world_data_${currentWorldMode}`, JSON.stringify(stateData));
+        }
+
+        function loadWorldState() {
+            const rawData = localStorage.getItem(`rumor_world_data_${currentWorldMode}`);
+            if (!rawData) {
+                generateTerrain(currentWorldMode);
+                return;
+            }
+
+            try {
+                const blocksData = JSON.parse(rawData);
+                clearCurrentWorld();
+                blocksData.forEach(b => {
+                    spawnBlock(b.x, b.y, b.z, b.typeId);
+                });
+            } catch (e) {
+                generateTerrain(currentWorldMode);
             }
         }
 
@@ -417,6 +557,7 @@
             if (idx > -1) blockObjects.splice(idx, 1);
 
             playAudioEffect('break');
+            saveWorldState();
         }
 
         function spawnTree(x, y, z) {
@@ -435,7 +576,7 @@
             }
         }
 
-        generateTerrain();
+        loadWorldState();
 
         const player = {
             position: new THREE.Vector3(0, 8, 0),
@@ -640,6 +781,7 @@
                     const selected = HOTBAR_BLOCKS[selectedBlockIndex];
                     spawnBlock(placePos.x, placePos.y, placePos.z, selected.id);
                     playAudioEffect('place');
+                    saveWorldState();
                 }
             }
         }
@@ -834,3 +976,4 @@
     </script>
 </body>
 </html>
+
